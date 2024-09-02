@@ -68,7 +68,8 @@ app.layout = [
             size="lg",
             children=items,
             className="mb-3",id='dropdown-selection'),
-    dcc.Graph(id='graph-content')
+    dcc.Graph(id='graph-content'),
+    html.H2('By Samy Hachi')
 ]
 
 @callback(
