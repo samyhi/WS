@@ -24,6 +24,7 @@ table6 = merged_df[merged_df['account_tradeable'] == 'FALSE'].groupby('validatio
 
 # Set up Dash app and layout
 app = Dash(__name__, external_stylesheets=[dbc.themes.SLATE])
+server = app.server
 
 app.layout = html.Div([
     html.H1('Order Generation Insights', style={'textAlign': 'center'}),
