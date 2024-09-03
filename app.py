@@ -3,6 +3,9 @@ import plotly.graph_objects as go
 import pandas as pd
 import dash_bootstrap_components as dbc
 import plotly.express as px
+from plotly.subplots import make_subplots
+
+
 # Assuming df_trigger and df_validation are loaded as shown above
 df_trigger = pd.read_csv('data/table_trigger.csv')
 df_validation = pd.read_csv('data/table_validation.csv')
@@ -44,7 +47,8 @@ table6 = table6.sort_values(by='failure_count', ascending=False)
 app = Dash(__name__, external_stylesheets=[dbc.themes.SLATE])
 server = app.server
 app.layout = dbc.Container([
-    html.H1("Dashboard: Insights into Order Generation", style={'textAlign': 'center'}),
+    html.H1("Dashboard: Insights from Order Generation", style={'textAlign': 'center'}),
+    html.H3('For: WealthSimple Managed Investingq Team, By: Samy Hachi', style={'textAlign': 'center'}),
     dbc.Row([
         dbc.Col(dcc.Graph(id='graph1'), width=6),
         dbc.Col(dcc.Graph(id='graph2'), width=6),
@@ -52,7 +56,12 @@ app.layout = dbc.Container([
     dbc.Row([
         dbc.Col(dcc.Graph(id='graph3'), width=6),
         dbc.Col(dcc.Graph(id='graph4'), width=6),
-    ])
+    ]),
+    dcc.Interval(
+        id='interval-component',
+        interval=1*60*1000,  # in milliseconds
+        n_intervals=0
+    )
 ], fluid=True)
 
 @app.callback(
@@ -60,27 +69,69 @@ app.layout = dbc.Container([
      Output('graph2', 'figure'),
      Output('graph3', 'figure'),
      Output('graph4', 'figure')],
-    [Input('app-loading', 'children')]
+    [Input('interval-component', 'n_intervals')]
 )
 def update_graphs(_):
     # Create each figure using Plotly Express or Graph Objects
+    # Graph for Table 2
+    fig2 = make_subplots(specs=[[{"secondary_y": True}]])
+
+    fig2.add_trace(go.Bar(x=table2['trigger'],
+                          y=table2['failed_count'],
+                          name='Count of Failed Validations',
+                          marker_color='rgb(55, 83, 109)'
+                          ), secondary_y=False)
+    fig2.add_trace(go.Bar(x=table2['trigger'],
+                          y=table2['total_count'] / 9,
+                          name='Count of Total Validations',
+                          marker_color='rgb(26, 118, 255)'
+                          ), secondary_y=False)
+
+    fig2.add_trace(go.Scatter(x=table2['trigger'],
+                              y=table2['failure_rate_percentage'],
+                              name='Validation Failure Rate',
+                              marker_color='red'
+                              ), secondary_y=True)
+
+    fig2.update_layout(
+        title='Relationship triggers/validation outcomes',
+        xaxis_tickfont_size=14,
+        yaxis=dict(
+            titlefont_size=16,
+            tickfont_size=14,
+        ),
+        legend=dict(
+            x=0,
+            y=1.0,
+            bgcolor='rgba(255, 255, 255, 0)',
+            bordercolor='rgba(255, 255, 255, 0)'
+        ),
+        barmode='group',
+        bargap=0.15,  # gap between bars of adjacent location coordinates.
+        bargroupgap=0.1  # gap between bars of the same location coordinate.
+    )
+    fig2.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)', paper_bgcolor='rgba(0, 0, 0, 0)', font=dict(color='#FFFFFF'))
+    fig2.update_yaxes(title_text="Number of validation tests", secondary_y=False)
+    fig2.update_yaxes(title_text="Percentage of failure", secondary_y=True)
+
     fig1 = px.bar(table1, x='Account Tradeable', y='Average Excess Cash',
                   title='Average Excess Cash by Tradeable Status')
+    fig1.update_traces(marker_color='red')
+    fig1.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)', paper_bgcolor='rgba(0, 0, 0, 0)', font=dict(color='#FFFFFF'))
 
-    # Graph for Table 2
-    fig2 = px.bar(table2, x='trigger', y='failure_rate_percentage',
-                  title='Trigger Failures and Their Rates', color='trigger')
 
     # Graph for Table 4
     fig3 = px.bar(table4, x='Account Tradeable', y='Average Excess Cash',
                   title='Account Performance by Tradeable Status')
+    fig3.update_traces(marker_color='green')
+    fig3.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)', paper_bgcolor='rgba(0, 0, 0, 0)', font=dict(color='#FFFFFF'))
 
     # Graph for Table 6
     fig4 = px.pie(table6, names='validation_category', values='failure_count',
                   title='Validation Failures by Category')
-
+    fig4.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)', paper_bgcolor='rgba(0, 0, 0, 0)', font=dict(color='#FFFFFF'))
     # Add customization for each figure if necessary
-    return [fig1, fig2, fig3, fig4]
+    return [fig2, fig1, fig3, fig4]
 
 if __name__ == '__main__':
     app.run_server(debug=True, host='0.0.0.0', port=8080)
