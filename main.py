@@ -49,7 +49,7 @@ print(table2)
 DASH COMPONENTS
 
 '''
-app = Dash( external_stylesheets=[dbc.themes.SLATE])
+app = Dash(external_stylesheets=[dbc.themes.SLATE])
 app = app.server
 
 items = [
