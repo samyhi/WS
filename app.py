@@ -1,117 +1,111 @@
-from dash import Dash, html, dcc, callback, Output, Input
-import plotly.express as px
-import pandas as pd
+from dash import Dash, html, dcc, Input, Output
 import plotly.graph_objects as go
+import pandas as pd
 import dash_bootstrap_components as dbc
 
+# Assuming df_trigger and df_validation are loaded as shown above
 df_trigger = pd.read_csv('data/table_trigger.csv')
 df_validation = pd.read_csv('data/table_validation.csv')
 
-
-
-'''
-
-TRANSFORMATIONS
-
-'''
-import pandas as pd
-
-# Assuming df_trigger and df_validation are already defined and loaded
-
-# Deduplicate triggers and standardize the 'tripped' and 'trigger' fields
+# Data preprocessing and merging
+df_trigger['tripped'] = df_trigger['tripped'].str.upper().str.strip().replace({'TRUE': True, 'FALSE': False})
 df_trigger_dedup = df_trigger.drop_duplicates(subset=['account_canonical_id', 'run_datetime'])
-
-# Merge the trigger and validation dataframes
 merged_df = pd.merge(df_trigger_dedup, df_validation, on=['account_canonical_id', 'run_datetime'], how='left')
 merged_df['account_tradeable'] = merged_df['account_tradeable'].apply(lambda x: 'TRUE' if x else 'FALSE')
 
-# Calculate failure rates
-merged_df['Failed'] = merged_df['account_tradeable'] == 'FALSE'
+# Prepare the data for all the tables as described in the previous parts
+# Each table will be stored as a DataFrame named table1, table2, ..., table6
 
-# Total counts per trigger
-total_counts = merged_df['trigger'].value_counts().reset_index()
-total_counts.columns = ['trigger', 'total_count']
+# For demonstration, using placeholders for table creation based on previous discussions
+# Create these tables using pandas operations as previously detailed
 
-# Failed counts per trigger
-failed_counts = merged_df[merged_df['Failed']]['trigger'].value_counts().reset_index()
-failed_counts.columns = ['trigger', 'failed_count']
+# Placeholder data setup
+table1 = merged_df.groupby('account_tradeable')['excess_cash_amount'].agg(['mean', 'count']).reset_index()
+table2 = merged_df[merged_df['account_tradeable'] == 'FALSE'].groupby('trigger').size().reset_index(
+    name='Failure Count')
+table3 = merged_df.groupby(merged_df['run_datetime'].dt.hour).size().reset_index(name='Trigger Count')
+table4 = merged_df.groupby('account_tradeable')['excess_cash_amount'].agg(['mean', 'count']).reset_index()
+table5 = merged_df[['run_datetime', 'excess_cash_amount', 'trigger']].dropna(subset=['excess_cash_amount'])
+table6 = merged_df[merged_df['account_tradeable'] == 'FALSE'].groupby('validation_category').agg(
+    {'excess_cash_amount': ['mean', 'count']}).reset_index()
 
-# Merge counts and calculate percentages
-table2 = pd.merge(failed_counts, total_counts, on='trigger')
-table2['total_count'] = table2['total_count'] / 9
-table2['failure_rate_percentage'] = (table2['failed_count'] / table2['total_count']) * 100
-table2 = table2.sort_values(by='failure_rate_percentage', ascending=False)
-
-print(table2)
-
-
-'''
-
-DASH COMPONENTS
-
-'''
+# Set up Dash app and layout
 app = Dash(__name__, external_stylesheets=[dbc.themes.SLATE])
 server = app.server
 
-items = [
-    dbc.DropdownMenuItem("Excess cash"),
-    dbc.DropdownMenuItem(divider=True),
-    dbc.DropdownMenuItem("Portfolio rebalance"),
-    dbc.DropdownMenuItem(divider=True),
-    dbc.DropdownMenuItem("Withdrawal"),
-    dbc.DropdownMenuItem(divider=True),
-    dbc.DropdownMenuItem("Liquidation")
-]
+app.layout = html.Div([
+    html.H1('Order Generation Insights', style={'textAlign': 'center'}),
+    dbc.DropdownMenu(
+        label="Select Analysis",
+        children=[
+            dbc.DropdownMenuItem("Table 1: Cash Utilization", id="table1"),
+            dbc.DropdownMenuItem("Table 2: Trigger Failures", id="table2"),
+            dbc.DropdownMenuItem("Table 3: Timing Analysis", id="table3"),
+            dbc.DropdownMenuItem("Table 4: Account Performance", id="table4"),
+            dbc.DropdownMenuItem("Table 5: Future Cash Excess", id="table5"),
+            dbc.DropdownMenuItem("Table 6: Validation Failures", id="table6"),
+        ],
+        className="mb-3"
+    ),
+    dcc.Graph(id='graph-content')
+])
 
-app.layout = [
-    html.H1(children='Order Generation Insights', style={'textAlign':'center'}),
 
-    dbc.DropdownMenu(label="Trigger",
-            size="lg",
-            children=items,
-            className="mb-3",id='dropdown-selection'),
-    dcc.Graph(id='graph-content'),
-    html.H2('By Samy Hachi')
-]
-
-@callback(
+@app.callback(
     Output('graph-content', 'figure'),
-    Input('dropdown-selection', 'children'),
+    Input('table1', 'n_clicks'),
+    Input('table2', 'n_clicks'),
+    Input('table3', 'n_clicks'),
+    Input('table4', 'n_clicks'),
+    Input('table5', 'n_clicks'),
+    Input('table6', 'n_clicks'),
 )
-def update_graph(value):
+def update_graph(t1, t2, t3, t4, t5, t6):
+    ctx = dash.callback_context
 
-    fig = go.Figure()
-    fig.add_trace(go.Bar(x=table2['trigger'],
-                         y=table2['failed_count'],
-                         name='Count of Failed Validations',
-                         marker_color='rgb(55, 83, 109)'
-                         ))
-    fig.add_trace(go.Bar(x=table2['trigger'],
-                         y=table2['total_count'],
-                         name='Count of Total Validations',
-                         marker_color='rgb(26, 118, 255)'
-                         ))
+    if not ctx.triggered or ctx.triggered[0]['value'] is None:
+        fig = go.Figure()
+        fig.update_layout(title_text="Please select an analysis from the dropdown.")
+        return fig
 
-    fig.update_layout(
-        title='Relationship triggers/validation outcomes',
-        xaxis_tickfont_size=14,
-        yaxis=dict(
-            titlefont_size=16,
-            tickfont_size=14,
-        ),
-        legend=dict(
-            x=0,
-            y=1.0,
-            bgcolor='rgba(255, 255, 255, 0)',
-            bordercolor='rgba(255, 255, 255, 0)'
-        ),
-        barmode='group',
-        bargap=0.15,  # gap between bars of adjacent location coordinates.
-        bargroupgap=0.1  # gap between bars of the same location coordinate.
-    )
-    fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)', paper_bgcolor='rgba(0, 0, 0, 0)',font = dict(color = '#FFFFFF')
-)
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    if button_id == "table1":
+        fig = go.Figure(data=[
+            go.Bar(name='Average Excess Cash', x=table1['account_tradeable'], y=table1['mean']),
+            go.Bar(name='Total Accounts', x=table1['account_tradeable'], y=table1['count'])
+        ])
+        fig.update_layout(title_text='Impact of Validation Checks on Cash Utilization', barmode='group')
+    elif button_id == "table2":
+        fig = go.Figure(data=[
+            go.Bar(x=table2['trigger'], y=table2['Failure Count'])
+        ])
+        fig.update_layout(title_text='Failure Rate by Trigger Type')
+    elif button_id == "table3":
+        fig = go.Figure(data=[
+            go.Bar(x=table3['run_datetime'], y=table3['Trigger Count'])
+        ])
+        fig.update_layout(title_text='Timing Analysis for Trigger and Validation Activities')
+    elif button_id == "table4":
+        fig = go.Figure(data=[
+            go.Bar(x=table4['account_tradeable'], y=table4['mean'], name='Average Excess Cash'),
+            go.Bar(x=table4['account_tradeable'], y=table4['count'], name='Number of Transactions')
+        ])
+        fig.update_layout(title_text='Tradeable vs. Non-Tradeable Account Performance', barmode='group')
+    elif button_id == "table5":
+        fig = go.Figure(data=[
+            go.Scatter(x=table5['run_datetime'], y=table5['excess_cash_amount'], mode='markers')
+        ])
+        fig.update_layout(title_text='Predictive Modeling for Future Cash Excess')
+    elif button_id == "table6":
+        fig = go.Figure(data=[
+            go.Bar(x=table6['validation_category'], y=table6['excess_cash_amount']['mean'], name='Average Excess Cash'),
+            go.Bar(x=table6['validation_category'], y=table6['excess_cash_amount']['count'], name='Count of Failures')
+        ])
+        fig.update_layout(title_text='Linking Account Features to Validation Failures', barmode='group')
+
     return fig
 
+
 if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0", port=8000)
+    app.run_server(debug=True, host='0.0.0.0', port=8000)
