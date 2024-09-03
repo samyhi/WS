@@ -48,7 +48,7 @@ app = Dash(__name__, external_stylesheets=[dbc.themes.SLATE])
 server = app.server
 app.layout = dbc.Container([
     html.H1("Dashboard: Insights from Order Generation", style={'textAlign': 'center'}),
-    html.H3('For: WealthSimple Managed Investingq Team, By: Samy Hachi', style={'textAlign': 'center'}),
+    html.H3('For: WealthSimple Managed Investing Team, By: Samy Hachi', style={'textAlign': 'center'}),
     dbc.Row([
         dbc.Col(dcc.Graph(id='graph1'), width=6),
         dbc.Col(dcc.Graph(id='graph2'), width=6),
