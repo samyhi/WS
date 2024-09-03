@@ -2,7 +2,7 @@ from dash import Dash, html, dcc, Input, Output
 import plotly.graph_objects as go
 import pandas as pd
 import dash_bootstrap_components as dbc
-
+import plotly.express as px
 # Assuming df_trigger and df_validation are loaded as shown above
 df_trigger = pd.read_csv('data/table_trigger.csv')
 df_validation = pd.read_csv('data/table_validation.csv')
@@ -25,52 +25,34 @@ table6 = merged_df[merged_df['account_tradeable'] == 'FALSE'].groupby('validatio
 # Set up Dash app and layout
 app = Dash(__name__, external_stylesheets=[dbc.themes.SLATE])
 server = app.server
-
-app.layout = html.Div([
-    html.H1('Order Generation Insights', style={'textAlign': 'center'}),
-    dcc.Dropdown(
-        id='analysis-dropdown',
-        options=[
-            {'label': 'Table 1: Cash Utilization', 'value': 'table1'},
-            {'label': 'Table 2: Trigger Failures', 'value': 'table2'},
-            {'label': 'Table 4: Account Performance', 'value': 'table4'},
-            {'label': 'Table 6: Validation Failures', 'value': 'table6'}
-        ],
-        value='table1',
-        style={'width': '50%'}
-    ),
-    dcc.Graph(id='graph-content')
-])
+app.layout = dbc.Container([
+    html.H1("Dashboard: Insights into Order Generation", style={'textAlign': 'center'}),
+    dbc.Row([
+        dbc.Col(dcc.Graph(id='graph1'), width=6),
+        dbc.Col(dcc.Graph(id='graph2'), width=6),
+    ]),
+    dbc.Row([
+        dbc.Col(dcc.Graph(id='graph3'), width=6),
+        dbc.Col(dcc.Graph(id='graph4'), width=6),
+    ])
+], fluid=True)
 
 @app.callback(
-    Output('graph-content', 'figure'),
-    [Input('analysis-dropdown', 'value')]
+    [Output('graph1', 'figure'),
+     Output('graph2', 'figure'),
+     Output('graph3', 'figure'),
+     Output('graph4', 'figure')],
+    [Input('app-loading', 'children')]
 )
-def update_graph(selected_table):
-    if selected_table == "table1":
-        fig = go.Figure(data=[
-            go.Bar(name='Average Excess Cash', x=table1['account_tradeable'], y=table1['mean']),
-            go.Bar(name='Total Accounts', x=table1['account_tradeable'], y=table1['count'])
-        ])
-        fig.update_layout(title_text='Impact of Validation Checks on Cash Utilization', barmode='group')
-    elif selected_table == "table2":
-        fig = go.Figure(data=[
-            go.Bar(x=table2['trigger'], y=table2['Failure Count'])
-        ])
-        fig.update_layout(title_text='Failure Rate by Trigger Type')
-    elif selected_table == "table4":
-        fig = go.Figure(data=[
-            go.Bar(x=table4['account_tradeable'], y=table4['mean'], name='Average Excess Cash'),
-            go.Bar(x=table4['account_tradeable'], y=table4['count'], name='Number of Transactions')
-        ])
-        fig.update_layout(title_text='Tradeable vs. Non-Tradeable Account Performance', barmode='group')
-    elif selected_table == "table6":
-        fig = go.Figure(data=[
-            go.Bar(x=table6['validation_category'], y=table6['excess_cash_amount']['mean'], name='Average Excess Cash'),
-            go.Bar(x=table6['validation_category'], y=table6['excess_cash_amount']['count'], name='Count of Failures')
-        ])
-        fig.update_layout(title_text='Linking Account Features to Validation Failures', barmode='group')
-    return fig
+def update_graphs(_):
+    # Create each figure using Plotly Express or Graph Objects
+    fig1 = px.bar(merged_df, x='account_tradeable', y='excess_cash_amount', title="Table 1: Cash Utilization Insights")
+    fig2 = px.scatter(merged_df, x='trigger', y='excess_cash_amount', color='account_tradeable', title="Table 2: Trigger Failures")
+    fig3 = px.histogram(merged_df, x='account_tradeable', y='excess_cash_amount', title="Table 4: Account Performance")
+    fig4 = px.pie(merged_df, names='validation_category', title="Table 6: Validation Failures")
+
+    # Add customization for each figure if necessary
+    return [fig1, fig2, fig3, fig4]
 
 if __name__ == '__main__':
-    app.run_server(debug=True, host='0.0.0.0', port=8000)
+    app.run_server(debug=True, host='0.0.0.0', port=8080)
