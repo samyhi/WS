@@ -15,9 +15,7 @@ merged_df['account_tradeable'] = merged_df['account_tradeable'].apply(lambda x: 
 
 table1 = merged_df.groupby('account_tradeable')['excess_cash_amount'].agg(['mean', 'count']).reset_index()
 table2 = merged_df[merged_df['account_tradeable'] == 'FALSE'].groupby('trigger').size().reset_index(name='Failure Count')
-table3 = merged_df.groupby(merged_df['run_datetime'].dt.hour).size().reset_index(name='Trigger Count')
 table4 = merged_df.groupby('account_tradeable')['excess_cash_amount'].agg(['mean', 'count']).reset_index()
-table5 = merged_df[['run_datetime', 'excess_cash_amount', 'trigger']].dropna(subset=['excess_cash_amount'])
 table6 = merged_df[merged_df['account_tradeable'] == 'FALSE'].groupby('validation_category').agg({'excess_cash_amount': ['mean', 'count']}).reset_index()
 
 # Prepare the data for all the tables as described in previous parts
@@ -34,9 +32,7 @@ app.layout = html.Div([
         options=[
             {'label': 'Table 1: Cash Utilization', 'value': 'table1'},
             {'label': 'Table 2: Trigger Failures', 'value': 'table2'},
-            {'label': 'Table 3: Timing Analysis', 'value': 'table3'},
             {'label': 'Table 4: Account Performance', 'value': 'table4'},
-            {'label': 'Table 5: Future Cash Excess', 'value': 'table5'},
             {'label': 'Table 6: Validation Failures', 'value': 'table6'}
         ],
         value='table1',
@@ -61,22 +57,12 @@ def update_graph(selected_table):
             go.Bar(x=table2['trigger'], y=table2['Failure Count'])
         ])
         fig.update_layout(title_text='Failure Rate by Trigger Type')
-    elif selected_table == "table3":
-        fig = go.Figure(data=[
-            go.Bar(x=table3['run_datetime'], y=table3['Trigger Count'])
-        ])
-        fig.update_layout(title_text='Timing Analysis for Trigger and Validation Activities')
     elif selected_table == "table4":
         fig = go.Figure(data=[
             go.Bar(x=table4['account_tradeable'], y=table4['mean'], name='Average Excess Cash'),
             go.Bar(x=table4['account_tradeable'], y=table4['count'], name='Number of Transactions')
         ])
         fig.update_layout(title_text='Tradeable vs. Non-Tradeable Account Performance', barmode='group')
-    elif selected_table == "table5":
-        fig = go.Figure(data=[
-            go.Scatter(x=table5['run_datetime'], y=table5['excess_cash_amount'], mode='markers')
-        ])
-        fig.update_layout(title_text='Predictive Modeling for Future Cash Excess')
     elif selected_table == "table6":
         fig = go.Figure(data=[
             go.Bar(x=table6['validation_category'], y=table6['excess_cash_amount']['mean'], name='Average Excess Cash'),
