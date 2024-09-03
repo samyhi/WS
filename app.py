@@ -38,6 +38,7 @@ failed_counts.columns = ['trigger', 'failed_count']
 
 # Merge counts and calculate percentages
 table2 = pd.merge(failed_counts, total_counts, on='trigger')
+table2['total_count'] = table2['total_count'] / 9
 table2['failure_rate_percentage'] = (table2['failed_count'] / table2['total_count']) * 100
 table2 = table2.sort_values(by='failure_rate_percentage', ascending=False)
 
