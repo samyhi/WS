@@ -50,7 +50,7 @@ DASH COMPONENTS
 
 '''
 app = Dash(__name__, external_stylesheets=[dbc.themes.SLATE])
-app = app.server
+server = app.server
 
 items = [
     dbc.DropdownMenuItem("Excess cash"),
