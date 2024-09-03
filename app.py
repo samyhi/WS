@@ -8,13 +8,25 @@ from plotly.subplots import make_subplots
 
 # Assuming df_trigger and df_validation are loaded as shown above
 df_trigger = pd.read_csv('data/table_trigger.csv')
+df_trigger['run_datetime'] = pd.to_datetime(df_trigger['run_datetime'])
+
 df_validation = pd.read_csv('data/table_validation.csv')
+df_validation['run_datetime'] = pd.to_datetime(df_trigger['run_datetime'])
+
 
 # Data preprocessing and merging
 df_trigger_dedup = df_trigger.drop_duplicates(subset=['account_canonical_id', 'run_datetime'])
 merged_df = pd.merge(df_trigger_dedup, df_validation, on=['account_canonical_id', 'run_datetime'], how='left')
 merged_df['account_tradeable'] = merged_df['account_tradeable'].apply(lambda x: 'TRUE' if x else 'FALSE')
 
+# Filter for failures
+failures_df = merged_df[merged_df['account_tradeable'] == 'FALSE']
+
+# Group by date and count failures
+failures_time_series = failures_df.groupby(failures_df['run_datetime'].dt.date).size().reset_index(name='Failure Count')
+
+# Convert 'run_datetime' back to datetime for plotting
+failures_time_series['run_datetime'] = pd.to_datetime(failures_time_series['run_datetime'])
 
 # Table 1: Cash Utilization Insights
 table1 = merged_df.groupby('account_tradeable')['excess_cash_amount'].agg(['mean', 'count']).reset_index()
@@ -29,9 +41,35 @@ failed_counts.columns = ['trigger', 'failed_count']
 table2 = pd.merge(failed_counts, total_counts, on='trigger')
 table2['failure_rate_percentage'] = (table2['failed_count'] / table2['total_count']) * 100
 
-# Table 4: Account Performance Analysis
-table4 = merged_df.groupby('account_tradeable')['excess_cash_amount'].agg(['mean', 'count']).reset_index()
-table4.columns = ['Account Tradeable', 'Average Excess Cash', 'Number of Transactions']
+fig = px.line(failures_time_series, x='run_datetime', y='Failure Count',
+              title='Time Series of Validation Failures',
+              labels={'run_datetime': 'Date', 'Failure Count': 'Number of Failures'},
+              markers=True)  # Markers can help emphasize each data point
+
+# Enhance layout
+fig.update_layout(
+    xaxis_title='Date',
+    yaxis_title='Number of Validation Failures',
+    xaxis=dict(
+        rangeselector=dict(
+            buttons=list([
+                dict(count=1, label="1m", step="month", stepmode="backward"),
+                dict(count=6, label="6m", step="month", stepmode="backward"),
+                dict(step="all")
+            ])
+        ),
+        rangeslider=dict(
+            visible=True
+        ),
+        type="date"
+    )
+)
+
+#Table 5
+
+filtered_df = merged_df[merged_df['account_tradeable'] == 'FALSE']
+table5 = filtered_df.groupby('domain').agg(failure_count=('domain', 'count'),
+                                                        avg_excess_cash=('excess_cash_amount', 'mean')).reset_index()
 
 # Table 6: Validation Failures Analysis
 filtered_df = merged_df[merged_df['account_tradeable'] == 'FALSE']
@@ -121,9 +159,9 @@ def update_graphs(_):
 
 
     # Graph for Table 4
-    fig3 = px.bar(table4, x='Account Tradeable', y='Average Excess Cash',
-                  title='Account Performance by Tradeable Status')
-    fig3.update_traces(marker_color='green')
+    fig3 = px.pie(table5, names='domain', values='failure_count',
+                  title='Validation Failures by Category')
+
     fig3.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)', paper_bgcolor='rgba(0, 0, 0, 0)', font=dict(color='#FFFFFF'))
 
     # Graph for Table 6
@@ -134,4 +172,4 @@ def update_graphs(_):
     return [fig2, fig1, fig3, fig4]
 
 if __name__ == '__main__':
-    app.run_server(debug=True, host='0.0.0.0', port=8080)
+    app.run(debug=True, host="0.0.0.0", port=8000)
